@@ -2302,7 +2302,6 @@ gtp_action_reg_read(struct gtp_trace_s *gts, int num)
 		ret = gts->regs->ax;
 		break;
 	case 1:
-		printk(KERN_WARNING "cx\n");
 		ret = gts->regs->cx;
 		break;
 	case 2:
@@ -2312,8 +2311,8 @@ gtp_action_reg_read(struct gtp_trace_s *gts, int num)
 		ret = gts->regs->bx;
 		break;
 	case 4:
-		printk(KERN_WARNING "sp\n");
 		ret = (ULONGEST)(CORE_ADDR)&gts->regs->sp;
+		printk(KERN_WARNING "sp:%llx\n", ret);
 		break;
 	case 5:
 		ret = gts->regs->bp;
