@@ -2311,8 +2311,8 @@ gtp_action_reg_read(struct gtp_trace_s *gts, int num)
 		ret = gts->regs->bx;
 		break;
 	case 4:
-		ret = (ULONGEST)(CORE_ADDR)&gts->regs->sp;
-			printk(KERN_WARNING "sp1: %llx\n", ret);
+		ret = (ULONGEST)(void *)&gts->regs->sp;
+		printk(KERN_WARNING "sp1: %llx\n", ret);
 		break;
 	case 5:
 		ret = gts->regs->bp;
@@ -4127,8 +4127,8 @@ gtp_action_r(struct gtp_trace_s *gts, struct action *ae)
 	memcpy(regs, gts->regs, sizeof(struct pt_regs));
 #ifdef CONFIG_X86_32
 #if (LINUX_VERSION_CODE > KERNEL_VERSION(2,6,24))
-	regs->sp = (unsigned long)&regs->sp;
-	printk(KERN_WARNING "sp2: %llx\n", regs->sp);
+	regs->sp = (unsigned long)(void *)&regs->sp;
+	printk(KERN_WARNING "sp2: %lx\n", regs->sp);
 #else
 	regs->esp = (unsigned long)&regs->esp;
 #endif
