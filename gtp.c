@@ -20,7 +20,7 @@
  */
 
 /* If "* 10" means that this is not a release version.  */
-#define GTP_VERSION			(20130706)
+#define GTP_VERSION			(201307060)
 
 #include <linux/version.h>
 #ifndef RHEL_RELEASE_VERSION
@@ -4126,9 +4126,9 @@ gtp_action_r(struct gtp_trace_s *gts, struct action *ae)
 	memcpy(regs, gts->regs, sizeof(struct pt_regs));
 #ifdef CONFIG_X86_32
 #if (LINUX_VERSION_CODE > KERNEL_VERSION(2,6,24))
-	regs->sp = (unsigned long)&regs->sp;
+	regs->sp = (unsigned long)&gts->regs->sp;
 #else
-	regs->esp = (unsigned long)&regs->esp;
+	regs->esp = (unsigned long)&gts->regs->esp;
 #endif
 #endif	/* CONFIG_X86_32 */
 
