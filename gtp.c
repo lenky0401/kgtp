@@ -480,6 +480,8 @@ static int			gtp_noack_mode;
 
 static pid_t			gtp_current_pid;
 
+static struct task_struct	*gtpd_task;
+
 #ifdef CONFIG_X86
 /* Following part is for while-stepping.  */
 struct gtp_step_s {
@@ -11290,9 +11292,9 @@ gtp_write(struct file *file, const char __user *buf, size_t size,
 	is_reverse = 0;
 	switch (rsppkg[0]) {
 	case '?':
-		snprintf(gtp_rw_bufp, GTP_RW_BUFP_MAX, "S05");
-		gtp_rw_bufp += 3;
-		gtp_rw_size += 3;
+		snprintf(gtp_rw_bufp, GTP_RW_BUFP_MAX, "T05;thread:%d.%d;", gtpd_task->pid, gtpd_task->pid);
+		gtp_rw_size += strlen(gtp_rw_bufp);
+		gtp_rw_bufp += strlen(gtp_rw_bufp);
 		break;
 	case 'g':
 		ret = gtp_gdbrsp_g();
@@ -11359,6 +11361,11 @@ gtp_write(struct file *file, const char __user *buf, size_t size,
 #endif
 		else if (strncmp("qRcmd,", rsppkg, 6) == 0)
 			ret = gtp_gdbrsp_qRcmd(rsppkg + 6);
+		else if (strncmp("qAttached", rsppkg, 9) == 0) {
+			snprintf(gtp_rw_bufp, GTP_RW_BUFP_MAX, "1");
+			gtp_rw_size += 1;
+			gtp_rw_bufp += 1;
+		}
 		break;
 	case 'S':
 	case 'C':
@@ -12880,6 +12887,25 @@ static int __init gtp_init(void)
 	gtp_wq = create_singlethread_workqueue("gtpd");
 	if (gtp_wq == NULL)
 		goto out;
+
+	{
+		struct task_struct	*p;
+
+		/* Get the task of "gtpd".  */
+		gtpd_task = NULL;
+		for_each_process (p) {
+			if (strcmp(p->comm, "gtpd") == 0) {
+				if (gtpd_task != NULL)
+					printk(KERN_WARNING "KGTP: system have more than one gtpd.\n");
+				gtpd_task = p;
+			}
+		}
+		if (gtpd_task == NULL) {
+			printk(KERN_WARNING "KGTP: cannot get gtpd task.\n");
+			goto out;
+		}
+	}
+
 #ifdef USE_PROC
 	if (proc_create("gtp", S_IFIFO | S_IRUSR | S_IWUSR, NULL,
 			&gtp_operations) == NULL)
