@@ -480,6 +480,7 @@ static int			gtp_noack_mode;
 
 static pid_t			gtp_current_pid;
 
+/* gtpd_task->pid is used as the pid of Linux kernel.  */
 static struct task_struct	*gtpd_task;
 
 #ifdef CONFIG_X86
@@ -10418,7 +10419,7 @@ gtp_gdbrsp_m(char *pkg)
 #elif defined(GTP_FTRACE_RING_BUFFER) || defined(GTP_RB)
 	if (gtp_start || gtp_frame_current_num < 0) {
 #endif
-		if (gtp_current_pid) {
+		if (gtp_current_pid != gtpd_task->pid) {
 			int ret = gtp_task_read(gtp_current_pid, NULL, addr,
 						gtp_m_buffer, (int)len, 0);
 			if (ret < 0)
@@ -10811,8 +10812,6 @@ gtp_gdbrsp_H(char *pkg)
 		gtp_replay_reset();
 #endif
 
-	gtp_current_pid = (pid_t)pid;
-
 	return 0;
 }
 
@@ -11186,7 +11185,7 @@ gtp_release(struct inode *inode, struct file *file)
 
 	gtp_gtp_pid_count--;
 	if (gtp_gtp_pid_count == 0) {
-		gtp_current_pid = 0;
+		gtp_current_pid = gtpd_task->pid;
 		gtp_gtp_pid = -1;
 	}
 
@@ -11292,7 +11291,8 @@ gtp_write(struct file *file, const char __user *buf, size_t size,
 	is_reverse = 0;
 	switch (rsppkg[0]) {
 	case '?':
-		snprintf(gtp_rw_bufp, GTP_RW_BUFP_MAX, "T05;thread:%d.%d;", gtpd_task->pid, gtpd_task->pid);
+		snprintf(gtp_rw_bufp, GTP_RW_BUFP_MAX, "T05;thread:%d.%d;",
+			 gtp_current_pid, gtp_current_pid);
 		gtp_rw_size += strlen(gtp_rw_bufp);
 		gtp_rw_bufp += strlen(gtp_rw_bufp);
 		break;
@@ -11385,6 +11385,16 @@ gtp_write(struct file *file, const char __user *buf, size_t size,
 				gtp_replay_reset();
 #endif
 			ret = gtp_gdbrsp_vAttach(rsppkg + 8);
+		} else if (strncmp("vKill;", rsppkg, 7) == 0) {
+#ifdef GTP_RB
+			if (gtp_replay_step_id)
+				gtp_replay_reset();
+#endif
+			/* XXX:  When we add more code to support trace
+			   user space program.  We need add more release
+			   code to this part.
+			   Release tracepoint for this tracepoint.  */
+			ret = 0;
 		}
 		break;
 	case 'D':
@@ -12917,7 +12927,6 @@ static int __init gtp_init(void)
 	gtp_pipe_trace = 0;
 	gtp_bt_size = 512;
 	gtp_noack_mode = 0;
-	gtp_current_pid = 0;
 #ifdef GTP_RB
 	gtp_traceframe_info = NULL;
 	gtp_traceframe_info_len = 0;
@@ -12963,6 +12972,7 @@ static int __init gtp_init(void)
 			printk(KERN_WARNING "KGTP: cannot get gtpd task.\n");
 			goto out;
 		}
+		gtp_current_pid = gtpd_task->pid;
 	}
 
 #ifdef USE_PROC
