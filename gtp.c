@@ -11291,8 +11291,11 @@ gtp_write(struct file *file, const char __user *buf, size_t size,
 	is_reverse = 0;
 	switch (rsppkg[0]) {
 	case '?':
-		snprintf(gtp_rw_bufp, GTP_RW_BUFP_MAX, "T05;thread:%d.%d;",
-			 gtp_current_pid, gtp_current_pid);
+		if (gtp_current_pid == 0)
+			snprintf(gtp_rw_bufp, GTP_RW_BUFP_MAX, "S05");
+		else
+			snprintf(gtp_rw_bufp, GTP_RW_BUFP_MAX, "T05;thread:p%d.%d;",
+				 gtp_current_pid, gtp_current_pid);
 		gtp_rw_size += strlen(gtp_rw_bufp);
 		gtp_rw_bufp += strlen(gtp_rw_bufp);
 		break;
