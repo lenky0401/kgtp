@@ -3470,11 +3470,6 @@ static struct thread_info	gtp_fake_thread;
 #endif
 #endif
 
-//teawater
-static int (*gtp_access_remote_vm) (struct mm_struct *mm, unsigned long addr,
-			            void *buf, int len, int write);
-
-
 /* Example: access_remote_vm */
 
 static int
@@ -3539,9 +3534,6 @@ gtp_task_read(pid_t pid, struct task_struct *tsk, unsigned long addr,
 	}
 	if (!mm)
 		goto out;
-
-	//teawater
-	return gtp_access_remote_vm(mm, addr, buf, len, 0);
 
 	if (in_kprobe_handler) {
 		if (!down_read_trylock(&mm->mmap_sem))
@@ -12996,9 +12988,6 @@ static int __init gtp_init(void)
 	ret = gtp_var_special_add_all();
 	if (ret)
 		goto out;
-
-//teawater
-	gtp_access_remote_vm = 0xc112aa20;
 
 	ret = 0;
 out:
