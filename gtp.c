@@ -818,8 +818,10 @@ enum {
 	GTP_STEP_COUNT_ID			= 44,
 	GTP_STEP_ID_ID				= 45,
 
+	GTP_INFERIOR_PID_ID			= 47,
+
 	GTP_VAR_SPECIAL_MIN			= GTP_VAR_VERSION_ID,
-	GTP_VAR_SPECIAL_MAX			= GTP_WATCH_PREV_VAL_ID,
+	GTP_VAR_SPECIAL_MAX			= GTP_INFERIOR_PID_ID,
 };
 
 enum pe_tv_id {
@@ -1937,6 +1939,18 @@ static struct gtp_var_hooks	gtp_step_id_hooks = {
 #endif
 
 static int
+gtp_inferior_pid_get_val(struct gtp_trace_s *gts, struct gtp_var *gtv,
+			 int64_t *val)
+{
+	*val = gtp_current_pid;
+	return 0;
+}
+
+static struct gtp_var_hooks	gtp_inferior_pid_hooks = {
+	.agent_get_val = gtp_inferior_pid_get_val,
+};
+
+static int
 gtp_var_special_add_all(void)
 {
 	struct gtp_var	*var;
@@ -2170,6 +2184,11 @@ gtp_var_special_add_all(void)
 	if (IS_ERR(var))
 		return PTR_ERR(var);
 #endif
+
+	var = gtp_var_special_add(GTP_INFERIOR_PID_ID, 0, 0,
+				  "inferior_pid", &gtp_inferior_pid_hooks);
+	if (IS_ERR(var))
+		return PTR_ERR(var);
 
 	return 0;
 }
@@ -12975,6 +12994,7 @@ static int __init gtp_init(void)
 			printk(KERN_WARNING "KGTP: cannot get gtpd task.\n");
 			goto out;
 		}
+		gtp_tracepi
 		gtp_current_pid = gtpd_task->pid;
 	}
 
