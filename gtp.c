@@ -371,6 +371,12 @@ struct gtp_entry {
 
 	struct gtp_entry	*next;
 
+	/* Pid for this tracepoint.
+	   KGTP will use this pid to select Kprobe or Uprobe.
+	   And use this pid to get the inode for Uprobe if need.
+	   In default, this pid will bet set to gtp_current_pid.  */
+	pid_t			pid;
+
 	int			disable;
 	ULONGEST		pass;
 	struct gtpsrc		*src;
@@ -5460,6 +5466,8 @@ gtp_list_add(ULONGEST num, ULONGEST addr)
 #endif
 	INIT_LIST_HEAD(&ret->action_list);
 	INIT_LIST_HEAD(&ret->step_action_list);
+
+	ret->pid = gtp_current_pid;
 
 	/* Add to gtp_list.  */
 	ret->next = gtp_list;
