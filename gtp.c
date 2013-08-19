@@ -8380,7 +8380,7 @@ next_list:
 
 		if (tpe->pid != gtpd_task->pid) {
 #ifdef CONFIG_UPROBES
-			
+			struct mm_struct	*mm;
 #else
 			printk(KERN_WARNING "Cannot trace user program because Linux Kernel config doesn't open UPROBES.  Please open it in 'Kernel hacking->Tracers->Enable uprobes-based dynamic events' if you need it.\n");
 			gtp_gdbrsp_qtstop();
