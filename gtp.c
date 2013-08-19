@@ -6794,6 +6794,13 @@ gtp_check_setv(struct gtp_entry *tpe, struct action *ae, int step,
 			}
 			break;
 #endif
+		case GTP_INFERIOR_PID_ID:
+			if (stack) {
+				tpe->pid = (pid_t)top;
+				ret = 1;
+				goto out;
+			}
+			break;
 		}
 
 		if (!var->u.hooks || (var->u.hooks
@@ -13002,7 +13009,6 @@ static int __init gtp_init(void)
 			printk(KERN_WARNING "KGTP: cannot get gtpd task.\n");
 			goto out;
 		}
-		gtp_tracepi
 		gtp_current_pid = gtpd_task->pid;
 	}
 
