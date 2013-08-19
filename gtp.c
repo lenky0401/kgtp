@@ -152,7 +152,11 @@
 
 /* check ---------------------------------------------------------- */
 #ifndef CONFIG_KPROBES
-#error "Linux Kernel doesn't support KPROBES.  Please open it in 'General setup->Kprobes'."
+#warning "Cannot trace Linux kernel because Linux Kernel config doesn't open KPROBES.  Please open it in 'General setup->Kprobes' if you need it."
+#endif
+
+#ifndef CONFIG_UPROBES
+#warning "Cannot trace user program because Linux Kernel config doesn't open UPROBES.  Please open it in 'Kernel hacking->Tracers->Enable uprobes-based dynamic events' if you need it."
 #endif
 
 #ifdef USE_PROC
