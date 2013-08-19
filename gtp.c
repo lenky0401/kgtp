@@ -8378,72 +8378,90 @@ next_list:
 		tasklet_init(&tpe->u.kp.stop_tasklet, gtp_wq_add_work,
 			     (unsigned long)&tpe->u.kp.stop_work);
 
+		if (tpe->pid != gtpd_task->pid) {
+#ifdef CONFIG_UPROBES
+			
+#else
+			printk(KERN_WARNING "Cannot trace user program because Linux Kernel config doesn't open UPROBES.  Please open it in 'Kernel hacking->Tracers->Enable uprobes-based dynamic events' if you need it.\n");
+			gtp_gdbrsp_qtstop();
+			return -ENOSYS;
+#endif
+#endif
+		} else {
+#ifdef CONFIG_KPROBES
+			/* This part is for Kprobe.  */
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,30))
-		if (tpe->disable)
-			tpe->u.kp.kpret.kp.flags |= KPROBE_FLAG_DISABLED;
+			if (tpe->disable)
+				tpe->u.kp.kpret.kp.flags |= KPROBE_FLAG_DISABLED;
 #endif
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,30))
-		if (tpe->addr != 0) {
+			if (tpe->addr != 0) {
 #else
-		if (tpe->disable == 0 && tpe->addr != 0) {
+			if (tpe->disable == 0 && tpe->addr != 0) {
 #endif
-			tpe->u.kp.kpret.kp.addr = (kprobe_opcode_t *) (CORE_ADDR)tpe->addr;
-			if (tpe->flags & GTP_ENTRY_FLAGS_IS_KRETPROBE) {
-				if (gtp_access_cooked_clock
+				tpe->u.kp.kpret.kp.addr = (kprobe_opcode_t *) (CORE_ADDR)tpe->addr;
+				if (tpe->flags & GTP_ENTRY_FLAGS_IS_KRETPROBE) {
+					if (gtp_access_cooked_clock
 #ifdef CONFIG_X86
-				    || gtp_access_cooked_rdtsc
+					|| gtp_access_cooked_rdtsc
 #endif
 #ifdef GTP_PERF_EVENTS
-				    || gtp_have_pc_pe
+					|| gtp_have_pc_pe
 #endif
-				)
-					tpe->u.kp.kpret.handler = gtp_kp_ret_handler_plus;
-				else
-					tpe->u.kp.kpret.handler = gtp_kp_ret_handler;
+					)
+						tpe->u.kp.kpret.handler = gtp_kp_ret_handler_plus;
+					else
+						tpe->u.kp.kpret.handler = gtp_kp_ret_handler;
 
-				ret = register_kretprobe(&tpe->u.kp.kpret);
-			} else {
-				if (gtp_access_cooked_clock
+					ret = register_kretprobe(&tpe->u.kp.kpret);
+				} else {
+					if (gtp_access_cooked_clock
 #ifdef CONFIG_X86
-				    || gtp_access_cooked_rdtsc
+					|| gtp_access_cooked_rdtsc
 #endif
 #ifdef GTP_PERF_EVENTS
-				    || gtp_have_pc_pe
+					|| gtp_have_pc_pe
 #endif
-				) {
+					) {
 #ifdef CONFIG_X86
-					if (tpe->step || gtp_have_step) {
+						if (tpe->step || gtp_have_step) {
 #else
-					if (tpe->step) {
+						if (tpe->step) {
 #endif
-						tpe->u.kp.kpret.kp.pre_handler = gtp_kp_pre_handler_plus_step;
-						tpe->u.kp.kpret.kp.post_handler = gtp_kp_post_handler_plus;
-					} else
-						tpe->u.kp.kpret.kp.pre_handler = gtp_kp_pre_handler_plus;
-				} else {
-					tpe->u.kp.kpret.kp.pre_handler = gtp_kp_pre_handler;
+							tpe->u.kp.kpret.kp.pre_handler = gtp_kp_pre_handler_plus_step;
+							tpe->u.kp.kpret.kp.post_handler = gtp_kp_post_handler_plus;
+						} else
+							tpe->u.kp.kpret.kp.pre_handler = gtp_kp_pre_handler_plus;
+					} else {
+						tpe->u.kp.kpret.kp.pre_handler = gtp_kp_pre_handler;
 #ifdef CONFIG_X86
-					if (tpe->step || gtp_have_step)
+						if (tpe->step || gtp_have_step)
 #else
-					if (tpe->step)
+						if (tpe->step)
 #endif
-						tpe->u.kp.kpret.kp.post_handler = gtp_kp_post_handler;
+							tpe->u.kp.kpret.kp.post_handler = gtp_kp_post_handler;
+					}
+					ret = register_kprobe(&tpe->u.kp.kpret.kp);
 				}
-				ret = register_kprobe(&tpe->u.kp.kpret.kp);
-			}
-			if (ret < 0) {
-				printk(KERN_WARNING "gtp_gdbrsp_qtstart: register tracepoint %d %p got error.\n",
-				(int)tpe->num, (void *)(CORE_ADDR)tpe->addr);
-				if (gtp_start_ignore_error) {
-					gtp_start_last_errno = (uint64_t)ret;
-					continue;
-				} else {
-					gtp_gdbrsp_qtstop();
-					return ret;
+				if (ret < 0) {
+					printk(KERN_WARNING "gtp_gdbrsp_qtstart: register tracepoint %d %p got error.\n",
+					(int)tpe->num, (void *)(CORE_ADDR)tpe->addr);
+					if (gtp_start_ignore_error) {
+						gtp_start_last_errno = (uint64_t)ret;
+						continue;
+					} else {
+						gtp_gdbrsp_qtstop();
+						return ret;
+					}
 				}
+				tpe->flags |= GTP_ENTRY_FLAGS_REG;
 			}
-			tpe->flags |= GTP_ENTRY_FLAGS_REG;
+#else
+			printk(KERN_WARNING "Cannot trace Linux kernel because Linux Kernel config doesn't open KPROBES.  Please open it in 'General setup->Kprobes' if you need it.\n");
+			gtp_gdbrsp_qtstop();
+			return -ENOSYS;
+#endif
 		}
 	}
 	ret = 0;
