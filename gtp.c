@@ -2311,7 +2311,8 @@ gtp_action_reg_read(struct gtp_trace_s *gts, int num)
 		ret = gts->regs->bx;
 		break;
 	case 4:
-		ret = (ULONGEST)(CORE_ADDR)&gts->regs->sp;
+		//ret = (ULONGEST)(CORE_ADDR)&gts->regs->sp;
+		ret = gts->regs->sp;
 		break;
 	case 5:
 		ret = gts->regs->bp;
@@ -4126,7 +4127,8 @@ gtp_action_r(struct gtp_trace_s *gts, struct action *ae)
 	memcpy(regs, gts->regs, sizeof(struct pt_regs));
 #ifdef CONFIG_X86_32
 #if (LINUX_VERSION_CODE > KERNEL_VERSION(2,6,24))
-	regs->sp = (unsigned long)&gts->regs->sp;
+	//regs->sp = (unsigned long)&gts->regs->sp;
+	regs->sp = gts->regs->sp;
 #else
 	regs->esp = (unsigned long)&gts->regs->esp;
 #endif
