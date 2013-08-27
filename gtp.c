@@ -3413,6 +3413,8 @@ no_page_table:
 
 /* Example: __get_user_pages */
 
+struct vm_area_struct *(*fp)(struct mm_struct * mm, unsigned long addr);
+
 static int
 gtp_get_user_page(struct mm_struct *mm, unsigned long start,
 		  struct page **pages, struct vm_area_struct **vmas)
@@ -3422,7 +3424,9 @@ gtp_get_user_page(struct mm_struct *mm, unsigned long start,
 
 	/* XXX: not use find_extend_vma because cannot get
 	   find_vma_prev and expand_stack.  */
-	vma = find_vma(mm, start);
+// 	vma = find_vma(mm, start);
+	fp = 0xc112da00;
+	vma = fp(mm, start);
 	if (vma == NULL || vma->vm_flags & VM_LOCKED)
 		return 0;
 
