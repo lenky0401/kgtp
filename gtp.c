@@ -3423,7 +3423,7 @@ gtp_get_user_page(struct mm_struct *mm, unsigned long start,
 	/* XXX: not use find_extend_vma because cannot get
 	   find_vma_prev and expand_stack.  */
 	vma = find_vma(mm, start);
-	if (vma->vm_flags & VM_LOCKED)
+	if (vma == NULL || vma->vm_flags & VM_LOCKED)
 		return 0;
 
 	/* XXX: not use get_gate_vma because not support vm_normal_page. */
