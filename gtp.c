@@ -4978,7 +4978,7 @@ gtp_handler(struct gtp_trace_s *gts)
 		} else {
 #ifdef CONFIG_X86_32
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,25))
-			gts->x86_32_sp = (long)&gts->regs->sp;
+			gts->x86_32_sp = (unsigned long)&gts->regs->sp;
 #else
 			gts->x86_32_sp = (unsigned long)&gts->regs->esp;
 #endif
