@@ -2311,10 +2311,7 @@ gtp_action_reg_read(struct gtp_trace_s *gts, int num)
 		ret = gts->regs->bx;
 		break;
 	case 4:
-		if (gts->tpe->flags & GTP_ENTRY_FLAGS_CURRENT_TASK
-		    && user_mode(gts->regs))
-		//ret = (ULONGEST)(CORE_ADDR)&gts->regs->sp;
-		ret = gts->regs->sp;
+		ret = gts->x86_32_sp;
 		break;
 	case 5:
 		ret = gts->regs->bp;
@@ -2366,7 +2363,7 @@ gtp_action_reg_read(struct gtp_trace_s *gts, int num)
 		ret = gts->regs->ebx;
 		break;
 	case 4:
-		ret = (ULONGEST)(CORE_ADDR)&gts->regs->esp;
+		ret = gts->x86_32_sp;
 		break;
 	case 5:
 		ret = gts->regs->ebp;
@@ -4129,10 +4126,9 @@ gtp_action_r(struct gtp_trace_s *gts, struct action *ae)
 	memcpy(regs, gts->regs, sizeof(struct pt_regs));
 #ifdef CONFIG_X86_32
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,25))
-	//regs->sp = (unsigned long)&gts->regs->sp;
-	regs->sp = gts->regs->sp;
+	regs->sp = gts->x86_32_sp;
 #else
-	regs->esp = (unsigned long)&gts->regs->esp;
+	regs->esp = gts->x86_32_sp;
 #endif
 #endif	/* CONFIG_X86_32 */
 
@@ -4970,8 +4966,32 @@ gtp_handler(struct gtp_trace_s *gts)
 		} else
 			gts->regs = task_pt_regs(get_current());
 
-		if (user_mode(gts->regs))
+		if (user_mode(gts->regs)) {
 			gts->read_memory = gtp_task_handler_read;
+#ifdef CONFIG_X86_32
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,25))
+			gts->x86_32_sp = gts->regs->sp;
+#else
+			gts->x86_32_sp = gts->regs->esp;
+#endif
+#endif
+		} else {
+#ifdef CONFIG_X86_32
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,25))
+			gts->x86_32_sp = &gts->regs->sp;
+#else
+			gts->x86_32_sp = &gts->regs->esp;
+#endif
+#endif
+		}
+	} else {
+#ifdef CONFIG_X86_32
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,25))
+		gts->x86_32_sp = &gts->regs->sp;
+#else
+		gts->x86_32_sp = &gts->regs->esp;
+#endif
+#endif
 	}
 
 	if ((gts->tpe->flags & GTP_ENTRY_FLAGS_REG) == 0)
