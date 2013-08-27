@@ -72,6 +72,11 @@ struct gtp_var;
 struct gtp_trace_s {
 	struct gtp_entry		*tpe;
 	struct pt_regs			*regs;
+
+#ifdef CONFIG_X86_32
+	unsigned long			sp;
+#endif
+
 	long				(*read_memory)(void *dst,
 						       void *src,
 						       size_t size);

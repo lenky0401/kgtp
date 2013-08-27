@@ -2311,6 +2311,8 @@ gtp_action_reg_read(struct gtp_trace_s *gts, int num)
 		ret = gts->regs->bx;
 		break;
 	case 4:
+		if (gts->tpe->flags & GTP_ENTRY_FLAGS_CURRENT_TASK
+		    && user_mode(gts->regs))
 		//ret = (ULONGEST)(CORE_ADDR)&gts->regs->sp;
 		ret = gts->regs->sp;
 		break;
