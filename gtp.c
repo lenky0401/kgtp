@@ -342,6 +342,11 @@ struct gtp_entry {
 			struct work_struct	stop_work;
 		} kp;
 
+		struct gtp_up {
+			struct inode	*inode;
+			loff_t		offset;
+		} up;
+
 		/* For gtp_entry_watch_static and gtp_entry_watch_dynamic.  */
 		struct {
 			int type;
