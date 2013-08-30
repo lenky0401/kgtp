@@ -156,7 +156,11 @@
 #endif
 
 #ifndef CONFIG_UPROBES
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,5,0))
 #warning "Cannot trace user program because Linux Kernel config doesn't open UPROBES.  Please open it in 'Kernel hacking->Tracers->Enable uprobes-based dynamic events' if you need it."
+#else
+#warning "Cannot trace user program because the Linux Kernel that older than 3.5 doesn't support UPROBES."
+#endif
 #endif
 
 #ifdef USE_PROC
@@ -348,18 +352,23 @@ enum gtp_watch_type {
 
 struct gtp_entry {
 	union gtp_entry_u {
+#ifdef CONFIG_KPROBES
 		/* For gtp_entry_kprobe.  */
 		struct gtp_kp {
 			struct kretprobe	kpret;
 			struct tasklet_struct	stop_tasklet;
 			struct work_struct	stop_work;
 		} kp;
+#endif
 
+#ifdef CONFIG_UPROBES
 		/* For gtp_entry_uprobe.  */
 		struct gtp_up {
-			struct inode	*inode;
-			loff_t		offset;
+			struct inode		*inode;
+			loff_t			offset;
+			struct uprobe_consumer	uc;
 		} up;
+#endif
 
 		/* For gtp_entry_watch_static and gtp_entry_watch_dynamic.  */
 		struct {
@@ -3534,7 +3543,7 @@ gtp_task_read(pid_t pid, struct task_struct *tsk, unsigned long addr,
 
 	if (in_kprobe_handler) {
 		/* The tsk cannot be NULL.  */
-		/* get_task_mm */
+		/* Example: get_task_mm */
 		ret = -ENXIO;
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,27))
 		if (tsk->flags & PF_KTHREAD)
@@ -5043,6 +5052,11 @@ gtp_handler(struct gtp_trace_s *gts)
 		gts->x86_32_sp = (unsigned long)&gts->regs->esp;
 #endif
 #endif
+
+#ifdef CONFIG_UPROBES
+		if (gts->tpe->type == gtp_entry_uprobe)
+			gts->read_memory = gtp_task_handler_read;
+#endif
 	}
 
 	if ((gts->tpe->flags & GTP_ENTRY_FLAGS_REG) == 0)
@@ -5237,7 +5251,7 @@ gtp_kp_post_handler_1(struct kprobe *p, struct pt_regs *regs,
 	struct kretprobe	*kpret;
 	struct gtp_kp		*gkp;
 	union gtp_entry_u	*u;
-	struct gtp_entry		*tpe;
+	struct gtp_entry	*tpe;
 	struct gtp_trace_s	gts;
 
 	kpret = container_of(p, struct kretprobe, kp);
@@ -5367,6 +5381,28 @@ gtp_kp_ret_handler(struct kretprobe_instance *ri, struct pt_regs *regs)
 
 	return 0;
 }
+
+#ifdef CONFIG_UPROBES
+static int
+gtp_up_handler(struct uprobe_consumer *self, struct pt_regs *regs)
+{
+	struct gtp_up		*gup;
+	union gtp_entry_u	*u;
+	struct gtp_trace_s	gts;
+
+	memset(&gts, 0, sizeof(struct gtp_trace_s));
+
+	gup = container_of(self, struct gtp_up, uc);
+	u = container_of(gup, union gtp_entry_u, up);
+	gts.tpe = container_of(u, struct gtp_entry, u);
+
+	gts.regs = regs;
+
+	gtp_handler(&gts);
+
+	return 0;
+}
+#endif
 
 static struct action *
 gtp_action_alloc(char type)
@@ -6335,18 +6371,25 @@ gtp_gdbrsp_qtstop(void)
 	flush_workqueue(gtp_wq);
 
 	for (tpe = gtp_list; tpe; tpe = tpe->next) {
-		if (tpe->type != gtp_entry_kprobe
+		if ((tpe->type != gtp_entry_kprobe
+		     && tpe->type != gtp_entry_uprobe)
 		    || (tpe->flags & GTP_ENTRY_FLAGS_REG) == 0)
 			continue;
 
-		if (tpe->flags & GTP_ENTRY_FLAGS_IS_KRETPROBE)
-			unregister_kretprobe(&tpe->u.kp.kpret);
-		else
-			unregister_kprobe(&tpe->u.kp.kpret.kp);
+		if (tpe->type == gtp_entry_kprobe) {
+			if (tpe->flags & GTP_ENTRY_FLAGS_IS_KRETPROBE)
+				unregister_kretprobe(&tpe->u.kp.kpret);
+			else
+				unregister_kprobe(&tpe->u.kp.kpret.kp);
+			tasklet_kill(&tpe->u.kp.stop_tasklet);
+		} else {
+#if CONFIG_UPROBES
+			uprobe_unregister(tpe->u.up.inode, tpe->u.up.offset,
+					  &tpe->u.up.uc);
+#endif
+		}
 
 		tpe->flags &= ~GTP_ENTRY_FLAGS_REG;
-
-		tasklet_kill(&tpe->u.kp.stop_tasklet);
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,30))
 		tasklet_kill(&tpe->disable_tasklet);
@@ -7861,15 +7904,62 @@ gtp_wq_add_work(unsigned long data)
 	queue_work(gtp_wq, (struct work_struct *)data);
 }
 
+#ifdef CONFIG_UPROBES
 int
 gtp_uprobe_register(struct gtp_entry *tpe)
 {
+	int			ret = -EINVAL;
+	struct task_struct	*tsk;
+	struct mm_struct	*mm;
+	struct vm_area_struct	*vma;
+
+	if ((tpe->flags & GTP_ENTRY_FLAGS_CURRENT_TASK)
+	    || (tpe->flags & GTP_ENTRY_FLAGS_CURRENT_TASK)) {
+		printk(KERN_WARNING "KGTP: cannot use $current or $kret in actions of tracepoint %d %p.\n",
+		       (int)tpe->num, (void *)(CORE_ADDR)tpe->addr);
+		return -EINVAL;
+	}
+
 	if (tpe->disable)
 		return 0;
 
-	/* Get inode and offset.  */
-	
+	/* Get mm.  */
+	rcu_read_lock();
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,24))
+	tsk = pid_task(find_vpid(tpe->pid), PIDTYPE_PID);
+#else
+	tsk = find_task_by_pid(tpe->pid);
+#endif
+	if (!tsk) {
+		rcu_read_unlock();
+		return -ESRCH;
+	}
+	mm = get_task_mm(tsk);
+	rcu_read_unlock();
+	if (mm == NULL)
+		return -ESRCH;
+	down_read(&mm->mmap_sem);
+
+	/* Get inode "file_inode(vma->vm_file)" and
+	   offset "tpe->addr - vma->vm_start".  */
+	vma = find_vma(mm, tpe->addr);
+	if (vma == NULL)
+		goto out;
+	if (tpe->addr < vma->vm_start)
+		goto out;
+	tpe->u.up.inode = file_inode(vma->vm_file);
+	tpe->u.up.offset = tpe->addr - vma->vm_start;
+
+	tpe->u.up.uc.handler = gtp_up_handler;
+	ret = uprobe_register (tpe->u.up.inode, tpe->u.up.offset, &tpe->u.up.uc);
+
+out:
+	up_read(&mm->mmap_sem);
+	mmput(mm);
+
+	return ret;
 }
+#endif
 
 static int
 gtp_gdbrsp_qtstart(void)
@@ -8437,15 +8527,12 @@ next_list:
 
 		if (tpe->pid != gtpd_task->pid) {
 #ifdef CONFIG_UPROBES
-			struct mm_struct	*mm;
-
 			tpe->type = gtp_entry_uprobe;
 			ret = gtp_uprobe_register(tpe);
 #else
 			printk(KERN_WARNING "Cannot trace user program because Linux Kernel config doesn't open UPROBES.  Please open it in 'Kernel hacking->Tracers->Enable uprobes-based dynamic events' if you need it.\n");
 			gtp_gdbrsp_qtstop();
 			return -ENOSYS;
-#endif
 #endif
 		} else {
 #ifdef CONFIG_KPROBES
