@@ -7949,13 +7949,15 @@ gtp_uprobe_register(struct gtp_entry *tpe)
 		goto out;
 	tpe->u.up.inode = file_inode(vma->vm_file);
 	tpe->u.up.offset = tpe->addr - vma->vm_start;
-
 	tpe->u.up.uc.handler = gtp_up_handler;
-	ret = uprobe_register (tpe->u.up.inode, tpe->u.up.offset, &tpe->u.up.uc);
 
+	ret = 0;
 out:
 	up_read(&mm->mmap_sem);
 	mmput(mm);
+
+	if (ret == 0)
+		ret = uprobe_register (tpe->u.up.inode, tpe->u.up.offset, &tpe->u.up.uc);
 
 	return ret;
 }
