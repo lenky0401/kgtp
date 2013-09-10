@@ -10550,7 +10550,7 @@ gtp_gdbrsp_m(char *pkg)
 				       (unsigned long) cur_end);
 #endif
 				if (cur_start < cur_end) {
-					memcpy(gtp_m_buffer,
+					memcpy(gtp_m_buffer + cur_start - addr,
 						buf + cur_start - mr->addr,
 						cur_end - cur_start);
 					ret = 0;
@@ -10598,7 +10598,7 @@ gtp_gdbrsp_m(char *pkg)
 				       (unsigned long) cur_end);
 #endif
 				if (cur_start < cur_end) {
-					memcpy(gtp_m_buffer,
+					memcpy(gtp_m_buffer + cur_start - addr,
 						buf + cur_start - mr->addr,
 						cur_end - cur_start);
 					ret = 0;
@@ -10650,7 +10650,7 @@ gtp_gdbrsp_m(char *pkg)
 				       (unsigned long) cur_end);
 #endif
 				if (cur_start < cur_end) {
-					memcpy(gtp_m_buffer,
+					memcpy(gtp_m_buffer + cur_start - addr,
 						buf + cur_start - mr->addr,
 						cur_end - cur_start);
 					ret = 0;
