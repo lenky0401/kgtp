@@ -5144,15 +5144,15 @@ tpe_stop:
 
 	gts->tpe->flags &= ~GTP_ENTRY_FLAGS_REG;
 
+	/* XXX: need add stop code for other types of tracepoint.  */
 	if (gts->tpe->type == gtp_entry_kprobe) {
 		/* Following code can insert this task into tasklet without
 		   wake up softirqd.  */
 		add_preempt_count(HARDIRQ_OFFSET);
 		tasklet_schedule(&gts->tpe->u.kp.stop_tasklet);
 		sub_preempt_count(HARDIRQ_OFFSET);
-	} else {
-		//XXX teawater
 	}
+
 #ifdef GTP_DEBUG_V
 	printk(GTP_DEBUG_V "gtp_handler: tracepoint %d %p stop.\n",
 		(int)gts->tpe->num, (void *)(CORE_ADDR)gts->tpe->addr);
