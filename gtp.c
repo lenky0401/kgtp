@@ -5015,26 +5015,38 @@ gtp_handler(struct gtp_trace_s *gts)
 		gtp_step_stop(gts->regs);
 #endif
 
-	gts->read_memory = (void *)probe_kernel_read;
-	if (gts->tpe->flags & GTP_ENTRY_FLAGS_CURRENT_TASK) {
-		/* Get regs.  */
-		if (gts->tpe->get_regs) {
-			if (gtp_action_x(gts, gts->tpe->get_regs)
-			    || gts->tmp_regs == NULL)
-				goto tpe_stop;
-			gts->regs = gts->tmp_regs;
-		} else
-			gts->regs = task_pt_regs(get_current());
+	/* For the gtp_entry_uprobe, gtp_up_handler will setup gts to OK
+	   right status. */
+	if (gts->tpe->type != gtp_entry_uprobe) {
+		gts->read_memory = (void *)probe_kernel_read;
+		if (gts->tpe->flags & GTP_ENTRY_FLAGS_CURRENT_TASK) {
+			/* Get regs.  */
+			if (gts->tpe->get_regs) {
+				if (gtp_action_x(gts, gts->tpe->get_regs)
+				|| gts->tmp_regs == NULL)
+					goto tpe_stop;
+				gts->regs = gts->tmp_regs;
+			} else
+				gts->regs = task_pt_regs(get_current());
 
-		if (user_mode(gts->regs)) {
-			gts->read_memory = gtp_task_handler_read;
+			if (user_mode(gts->regs)) {
+				gts->read_memory = gtp_task_handler_read;
 #ifdef CONFIG_X86_32
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,25))
-			gts->x86_32_sp = gts->regs->sp;
+				gts->x86_32_sp = gts->regs->sp;
 #else
-			gts->x86_32_sp = gts->regs->esp;
+				gts->x86_32_sp = gts->regs->esp;
 #endif
 #endif
+			} else {
+#ifdef CONFIG_X86_32
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,25))
+				gts->x86_32_sp = (unsigned long)&gts->regs->sp;
+#else
+				gts->x86_32_sp = (unsigned long)&gts->regs->esp;
+#endif
+#endif
+			}
 		} else {
 #ifdef CONFIG_X86_32
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,25))
@@ -5043,20 +5055,12 @@ gtp_handler(struct gtp_trace_s *gts)
 			gts->x86_32_sp = (unsigned long)&gts->regs->esp;
 #endif
 #endif
-		}
-	} else {
-#ifdef CONFIG_X86_32
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,25))
-		gts->x86_32_sp = (unsigned long)&gts->regs->sp;
-#else
-		gts->x86_32_sp = (unsigned long)&gts->regs->esp;
-#endif
-#endif
 
 #ifdef CONFIG_UPROBES
-		if (gts->tpe->type == gtp_entry_uprobe)
-			gts->read_memory = gtp_task_handler_read;
+			if (gts->tpe->type == gtp_entry_uprobe)
+				gts->read_memory = gtp_task_handler_read;
 #endif
+		}
 	}
 
 	if ((gts->tpe->flags & GTP_ENTRY_FLAGS_REG) == 0)
@@ -5397,7 +5401,14 @@ gtp_up_handler(struct uprobe_consumer *self, struct pt_regs *regs)
 	gts.tpe = container_of(u, struct gtp_entry, u);
 
 	gts.regs = regs;
-
+	gts.read_memory = gtp_task_handler_read;
+#ifdef CONFIG_X86_32
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,25))
+	gts.x86_32_sp = (unsigned long)&gts->regs->sp;
+#else
+	gts.x86_32_sp = (unsigned long)&gts->regs->esp;
+#endif
+#endif
 	gtp_handler(&gts);
 
 	return 0;
