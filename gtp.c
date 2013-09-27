@@ -5404,9 +5404,9 @@ gtp_up_handler(struct uprobe_consumer *self, struct pt_regs *regs)
 	gts.read_memory = gtp_task_handler_read;
 #ifdef CONFIG_X86_32
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,25))
-	gts.x86_32_sp = (unsigned long)&gts->regs->sp;
+	gts.x86_32_sp = (unsigned long)&gts.regs->sp;
 #else
-	gts.x86_32_sp = (unsigned long)&gts->regs->esp;
+	gts.x86_32_sp = (unsigned long)&gts.regs->esp;
 #endif
 #endif
 	gtp_handler(&gts);
