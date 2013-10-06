@@ -6712,7 +6712,7 @@ gtp_check_var_add(struct gtp_check_s *check, unsigned int pc,
 			}
 			rw_flags->num = num;
 			rw_flags->flags = 0;
-			list_add_tail(&check->var_rw_flags, &rw_flags->node);
+			list_add_tail(&rw_flags->node, &check->var_rw_flags);
 		}
 		rw_flags->flags |= flag;
 		if ((rw_flags->flags & 1) && (rw_flags->flags & 2))
@@ -6720,7 +6720,7 @@ gtp_check_var_add(struct gtp_check_s *check, unsigned int pc,
 	}
 
 	/* Add pc_checked to check.  */
-	list_add_tail(&check->var_pc_checked, &pc_checked->node);
+	list_add_tail(&pc_checked->node, &check->var_pc_checked);
 
 	return 0;
 }
